@@ -11,6 +11,7 @@ from mydataset import load_targetdata, load_auxiliary_data, loadTestData
 import mytest
 from scipy import sparse
 import logging
+import matplotlib.pyplot as plt
 
 
 def setup_seed(seed):
@@ -60,11 +61,26 @@ def parser_args():
     return parser.parse_args()
 
 
+def data_visualization(recall_list, precision_list, ndcg_list, length):
+    epochs = [10 * i for i in range(1, length + 1)]
+    fig, ax = plt.subplots()
+    plt.plot(epochs, recall_list, color='r', label='recall@5')
+    plt.plot(epochs, precision_list, color='b', label='precision@5')
+    plt.plot(epochs, ndcg_list, color='g', label="NDCG@5")
+    plt.legend()
+    plt.xlabel("iterate itme")
+    plt.ylabel('metrics')
+    plt.title('metrics of VAE++')
+    plt.show()
+
+
 def train(args, criterion, model: VAE, adam_optimizer, targetData_matrix, auxiliaryData_matrix,
           userList_train, testDict, userList_test, topN=[5, 10, 15, 20]):
     stop_count, anneal_cap, update_count = 0, 0.2, 0.0
     best_prec5, best_rec5, best_f15, best_ndcg5, best_1call5, best_iter = 0., 0., 0., 0., 0., 0
-
+    recall_list = []
+    precision_list = []
+    ndcg_list = []
     for epoch in range(args.epoch):
         random.shuffle(userList_train)
 
@@ -151,6 +167,9 @@ def train(args, criterion, model: VAE, adam_optimizer, targetData_matrix, auxili
             logger.info('Epoch: %d Loss: %.4f' % (epoch, loss))
             logger.info('Epoch: %d precision@5: %.4f recall@5: %.4f f1@5: %.4f ndcg@5: %.4f one_call@5: %.4f' % (
                 epoch, precision[0], recall[0], f1[0], ndcg[0], one_call[0]))
+            precision_list.append(precision[0])
+            recall_list.append(recall[0])
+            ndcg_list.append(ndcg[0])
 
             if best_ndcg5 < ndcg[0]:
                 best_prec5, best_rec5, best_f15, best_ndcg5, best_1call5, best_iter = precision[0], recall[0], f1[0], \
@@ -173,6 +192,8 @@ def train(args, criterion, model: VAE, adam_optimizer, targetData_matrix, auxili
         logger.info("F1@5: %.4f " % best_f15)
         logger.info("NDCG@5: %.4f " % best_ndcg5)
         logger.info("1-call@5: %.4f " % best_1call5)
+
+    return precision_list, recall_list, ndcg_list, len(precision_list)
 
 
 if __name__ == '__main__':
@@ -226,8 +247,10 @@ if __name__ == '__main__':
     timestamp = time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime())
     logger.info('Start time: %s' % timestamp)
 
-    train(args, criterion, model, optimizer, targetData_matrix, auxiliaryData_matrix, userList_train, testDict,
-          userList_test)
+    precision_list, recall_list, ndcg_list, length = train(args, criterion, model, optimizer,
+                                                           targetData_matrix,  auxiliaryData_matrix, userList_train,
+                                                           testDict, userList_test)
+    data_visualization(recall_list, precision_list, ndcg_list, length)
 
     timestamp = time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime())
     logger.info('End time: %s' % timestamp)
